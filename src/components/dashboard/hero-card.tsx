@@ -3,13 +3,17 @@ import { formatCLP } from "@/lib/format";
 export function HeroCard({
   monthLabel,
   monthExpenses,
-  prevMonthToDateExpenses,
+  comparisonExpenses,
+  comparisonSuffix,
 }: {
   monthLabel: string;
   monthExpenses: number;
-  prevMonthToDateExpenses: number;
+  /** Gasto contra el que se compara (mismo período del mes anterior o mes completo). */
+  comparisonExpenses: number;
+  /** Texto que sigue al monto, p. ej. "que a esta altura del mes pasado". */
+  comparisonSuffix: string;
 }) {
-  const delta = monthExpenses - prevMonthToDateExpenses;
+  const delta = monthExpenses - comparisonExpenses;
   const spendingMore = delta > 0;
 
   return (
@@ -24,7 +28,7 @@ export function HeroCard({
         </p>
         <p className="mt-2 text-xs text-white/80">
           {spendingMore ? "▲" : "▼"} {formatCLP(Math.abs(delta))}{" "}
-          {spendingMore ? "más" : "menos"} que a esta altura del mes pasado
+          {spendingMore ? "más" : "menos"} {comparisonSuffix}
         </p>
       </div>
     </div>
