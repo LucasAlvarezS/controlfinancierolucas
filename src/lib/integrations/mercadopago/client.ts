@@ -73,7 +73,10 @@ export interface MpPayment {
   date_approved: string | null;
   date_created: string;
   status: string;
-  payer?: { email?: string };
+  operation_type?: string;
+  collector_id?: number;
+  collector?: { id?: number };
+  payer?: { id?: number | string; email?: string };
 }
 
 const SEARCH_PAGE_SIZE = 50;

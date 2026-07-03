@@ -5,7 +5,7 @@ import type {
   NormalizedMovement,
 } from "../provider.interface";
 import { refreshAccessToken, searchPayments } from "./client";
-import { mapPaymentToMovement } from "./mapper";
+import { isImportablePayment, mapPaymentToMovement } from "./mapper";
 
 export const mercadoPagoProvider: FinancialProvider = {
   provider: "MERCADOPAGO",
@@ -33,12 +33,15 @@ export const mercadoPagoProvider: FinancialProvider = {
 
   async syncMovements(
     tokens: CredentialTokens,
-    _externalAccountId: string,
+    externalAccountId: string,
     since: Date | null,
   ): Promise<NormalizedMovement[]> {
     if (!tokens.accessToken) throw new Error("Falta access token de Mercado Pago");
     const payments = await searchPayments(tokens.accessToken, since?.toISOString() ?? null);
-    return payments.map(mapPaymentToMovement);
+    // externalAccountId es el user id de MP: define la dirección del dinero.
+    return payments
+      .filter((payment) => isImportablePayment(payment, externalAccountId))
+      .map((payment) => mapPaymentToMovement(payment, externalAccountId));
   },
 
   async refreshTokensIfNeeded(tokens: CredentialTokens): Promise<CredentialTokens> {
