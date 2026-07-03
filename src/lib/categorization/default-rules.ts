@@ -1,0 +1,56 @@
+// Paleta categórica validada con la skill dataviz (CVD-safe en light; contraste
+// OK en dark). "Otros" usa un neutro (excluido de la distinción categórica).
+export const DEFAULT_CATEGORIES = [
+  { name: "Gasto Hormiga", icon: "coffee", color: "#7c3aed" },
+  { name: "Supermercado", icon: "shopping-cart", color: "#2a78d6" },
+  { name: "Ropa", icon: "shirt", color: "#e87ba4" },
+  { name: "Cuentas y Servicios", icon: "file-invoice", color: "#eb6834" },
+  { name: "Transporte", icon: "car", color: "#0d9488" },
+  { name: "Salud", icon: "heart", color: "#e34948" },
+  { name: "Entretenimiento", icon: "device-tv", color: "#eda100" },
+  { name: "Restaurantes", icon: "tools-kitchen-2", color: "#6366f1" },
+  { name: "Ahorro", icon: "piggy-bank", color: "#008300" },
+  { name: "Otros", icon: "dots", color: "#64748b" },
+] as const;
+
+export const DEFAULT_CATEGORY_OTROS = "Otros";
+
+/** merchantNormalized (lowercase, sin tildes) -> nombre de categoria default */
+export const DEFAULT_RULES: Array<{ pattern: string; category: string }> = [
+  { pattern: "uber", category: "Transporte" },
+  { pattern: "cabify", category: "Transporte" },
+  { pattern: "didi", category: "Transporte" },
+  { pattern: "copec", category: "Transporte" },
+  { pattern: "shell", category: "Transporte" },
+  { pattern: "petrobras", category: "Transporte" },
+  { pattern: "metro de santiago", category: "Transporte" },
+  { pattern: "red movilidad", category: "Transporte" },
+  { pattern: "jumbo", category: "Supermercado" },
+  { pattern: "lider", category: "Supermercado" },
+  { pattern: "tottus", category: "Supermercado" },
+  { pattern: "santa isabel", category: "Supermercado" },
+  { pattern: "unimarc", category: "Supermercado" },
+  { pattern: "falabella", category: "Ropa" },
+  { pattern: "ripley", category: "Ropa" },
+  { pattern: "h&m", category: "Ropa" },
+  { pattern: "zara", category: "Ropa" },
+  { pattern: "netflix", category: "Entretenimiento" },
+  { pattern: "spotify", category: "Entretenimiento" },
+  { pattern: "hbo", category: "Entretenimiento" },
+  { pattern: "disney", category: "Entretenimiento" },
+  { pattern: "enel", category: "Cuentas y Servicios" },
+  { pattern: "cge", category: "Cuentas y Servicios" },
+  { pattern: "aguas andinas", category: "Cuentas y Servicios" },
+  { pattern: "movistar", category: "Cuentas y Servicios" },
+  { pattern: "entel", category: "Cuentas y Servicios" },
+  { pattern: "claro", category: "Cuentas y Servicios" },
+  { pattern: "wom", category: "Cuentas y Servicios" },
+  { pattern: "rappi", category: "Restaurantes" },
+  { pattern: "pedidosya", category: "Restaurantes" },
+  { pattern: "uber eats", category: "Restaurantes" },
+  { pattern: "cruz verde", category: "Salud" },
+  { pattern: "salcobrand", category: "Salud" },
+  { pattern: "farmacias ahumada", category: "Salud" },
+  { pattern: "starbucks", category: "Gasto Hormiga" },
+  { pattern: "dunkin", category: "Gasto Hormiga" },
+];

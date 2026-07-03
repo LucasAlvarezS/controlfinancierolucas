@@ -1,0 +1,212 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountProvider {
+  MANUAL
+  MERCADOPAGO
+  FINTOC
+}
+
+enum Institution {
+  MERCADOPAGO
+  BANCO_ESTADO
+  BANCO_DE_CHILE
+  OTHER
+}
+
+enum AccountStatus {
+  ACTIVE
+  ERROR
+  DISCONNECTED
+}
+
+enum TransactionSource {
+  MANUAL
+  MERCADOPAGO
+  FINTOC
+}
+
+enum RuleMatchType {
+  CONTAINS
+  EQUALS
+  REGEX
+}
+
+enum RuleSource {
+  SYSTEM_DEFAULT
+  USER_DEFINED
+  LEARNED
+}
+
+enum SyncStatus {
+  SUCCESS
+  ERROR
+}
+
+enum ContributionSource {
+  MANUAL
+  TRANSACTION_LINK
+  AUTO_SURPLUS_SUGGESTION
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  financialAccounts   FinancialAccount[]
+  categories          Category[]
+  categorizationRules CategorizationRule[]
+  savingsGoals        SavingsGoal[]
+}
+
+model FinancialAccount {
+  id           String          @id @default(cuid())
+  userId       String
+  provider     AccountProvider
+  institution  Institution
+  externalId   String?
+  alias        String
+  currency     String          @default("CLP")
+  isSavings    Boolean         @default(false)
+  balance          Decimal?
+  balanceUpdatedAt DateTime?
+  lastSyncedAt DateTime?
+  status       AccountStatus   @default(ACTIVE)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credential   IntegrationCredential?
+  transactions Transaction[]
+  syncLogs     SyncLog[]
+
+  @@index([userId])
+}
+
+model IntegrationCredential {
+  id                    String          @id @default(cuid())
+  financialAccountId    String          @unique
+  provider              AccountProvider
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  linkTokenEncrypted    String?
+  expiresAt             DateTime?
+  scopes                String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  financialAccount FinancialAccount @relation(fields: [financialAccountId], references: [id], onDelete: Cascade)
+}
+
+model Transaction {
+  id                 String            @id @default(cuid())
+  financialAccountId String
+  userId             String
+  externalId         String?
+  amount             Decimal
+  currency           String            @default("CLP")
+  description        String
+  merchantRaw        String?
+  merchantNormalized String?
+  date               DateTime
+  categoryId         String?
+  source             TransactionSource
+  rawPayload         Json?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  financialAccount     FinancialAccount      @relation(fields: [financialAccountId], references: [id], onDelete: Cascade)
+  category             Category?             @relation(fields: [categoryId], references: [id])
+  savingsContributions SavingsContribution[]
+
+  @@unique([financialAccountId, externalId])
+  @@index([userId, date])
+  @@index([categoryId])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  icon      String?
+  color     String?
+  parentId  String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user     User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  transactions        Transaction[]
+  categorizationRules CategorizationRule[]
+
+  @@index([userId])
+}
+
+model CategorizationRule {
+  id         String        @id @default(cuid())
+  userId     String?
+  matchType  RuleMatchType
+  pattern    String
+  categoryId String
+  priority   Int           @default(0)
+  source     RuleSource
+  createdAt  DateTime      @default(now())
+
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SyncLog {
+  id                 String          @id @default(cuid())
+  financialAccountId String
+  provider           AccountProvider
+  startedAt          DateTime        @default(now())
+  finishedAt         DateTime?
+  status             SyncStatus?
+  itemsImported      Int             @default(0)
+  error              String?
+
+  financialAccount FinancialAccount @relation(fields: [financialAccountId], references: [id], onDelete: Cascade)
+
+  @@index([financialAccountId])
+}
+
+model SavingsGoal {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  targetAmount  Decimal
+  currentAmount Decimal   @default(0)
+  targetDate    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions SavingsContribution[]
+}
+
+model SavingsContribution {
+  id            String             @id @default(cuid())
+  goalId        String
+  amount        Decimal
+  date          DateTime           @default(now())
+  source        ContributionSource
+  transactionId String?
+  createdAt     DateTime           @default(now())
+
+  goal        SavingsGoal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([goalId])
+}
