@@ -22,7 +22,7 @@ export function CategoryDonut({
   if (total === 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
-        Todavía no hay gastos registrados en este período.
+        No hay movimientos en este período.
       </p>
     );
   }
