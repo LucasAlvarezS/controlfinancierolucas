@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/session";
-import { calculateMonthlySurplus } from "@/lib/savings/engine";
 import { HeroCard } from "@/components/dashboard/hero-card";
 import { StatTile } from "@/components/dashboard/stat-tile";
 import { CategoryDonut, type CategorySlice } from "@/components/dashboard/category-donut";
@@ -52,9 +51,15 @@ export default async function DashboardPage() {
   const month = now.getUTCMonth() + 1;
   const { start, end } = monthRange(year, month);
 
-  const prevDate = new Date(Date.UTC(year, month - 2, 1));
-  const prevYear = prevDate.getUTCFullYear();
-  const prevMonth = prevDate.getUTCMonth() + 1;
+  // "A esta altura del mes pasado": mismo tiempo transcurrido desde el inicio
+  // del mes anterior (capado a su fin, para meses más cortos).
+  const prevStart = new Date(Date.UTC(year, month - 2, 1));
+  const elapsedMs = now.getTime() - start.getTime();
+  const prevCutoff = new Date(Math.min(prevStart.getTime() + elapsedMs, start.getTime()));
+
+  const todayStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
 
   const expensesWhere = {
     userId,
@@ -62,22 +67,22 @@ export default async function DashboardPage() {
     financialAccount: { isSavings: false },
   };
 
-  const [monthByCategory, balanceAgg, currentSurplus, prevSurplus, savingsAgg] =
-    await Promise.all([
-      prisma.transaction.groupBy({
-        by: ["categoryId"],
-        where: { ...expensesWhere, date: { gte: start, lt: end } },
-        _sum: { amount: true },
-      }),
-      // Saldo actual: suma de los saldos sincronizados (cuentas Fintoc).
-      prisma.financialAccount.aggregate({
-        where: { userId, status: "ACTIVE" },
-        _sum: { balance: true },
-      }),
-      calculateMonthlySurplus(prisma, { userId, year, month }),
-      calculateMonthlySurplus(prisma, { userId, year: prevYear, month: prevMonth }),
-      prisma.savingsGoal.aggregate({ where: { userId }, _sum: { currentAmount: true } }),
-    ]);
+  const [monthByCategory, prevToDateAgg, todayAgg, savingsAgg] = await Promise.all([
+    prisma.transaction.groupBy({
+      by: ["categoryId"],
+      where: { ...expensesWhere, date: { gte: start, lt: end } },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.aggregate({
+      where: { ...expensesWhere, date: { gte: prevStart, lt: prevCutoff } },
+      _sum: { amount: true },
+    }),
+    prisma.transaction.aggregate({
+      where: { ...expensesWhere, date: { gte: todayStart, lt: end } },
+      _sum: { amount: true },
+    }),
+    prisma.savingsGoal.aggregate({ where: { userId }, _sum: { currentAmount: true } }),
+  ]);
 
   const categoryIds = [
     ...new Set(
@@ -89,7 +94,8 @@ export default async function DashboardPage() {
 
   const monthSlices = buildSlices(monthByCategory, categoryById);
   const totalExpenses = monthSlices.reduce((acc, s) => acc + s.value, 0);
-  const currentBalance = Number(balanceAgg._sum.balance ?? 0);
+  const prevMonthToDateExpenses = Math.abs(Number(prevToDateAgg._sum.amount ?? 0));
+  const todayExpenses = Math.abs(Number(todayAgg._sum.amount ?? 0));
 
   const savingsTotal = Number(savingsAgg._sum.currentAmount ?? 0);
   const monthLabel = start.toLocaleDateString("es-CL", { month: "long", year: "numeric" });
@@ -98,17 +104,16 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-3">
       <HeroCard
         monthLabel={monthLabel}
-        currentBalance={currentBalance}
         monthExpenses={totalExpenses}
-        deltaVsPrev={currentSurplus - prevSurplus}
+        prevMonthToDateExpenses={prevMonthToDateExpenses}
       />
 
       <div className="grid grid-cols-2 gap-3">
         <StatTile
-          label="Excedente del mes"
-          amount={Math.max(currentSurplus, 0)}
+          label="Gasto de hoy"
+          amount={todayExpenses}
           variant="gradient"
-          hint="Ingresos − gastos"
+          hint="Movimientos de hoy"
         />
         <StatTile label="Ahorro acumulado" amount={savingsTotal} hint="Metas de ahorro" />
       </div>
