@@ -28,16 +28,16 @@ export function CategoryDonut({
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:flex-row sm:gap-6">
-      <div className="relative h-44 w-44 shrink-0">
+    <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-6">
+      <div className="relative h-36 w-36 shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               dataKey="value"
               nameKey="name"
-              innerRadius={isPie ? 0 : 54}
-              outerRadius={80}
+              innerRadius={isPie ? 0 : 46}
+              outerRadius={68}
               paddingAngle={isPie ? 1 : 2}
               stroke="var(--card)"
               strokeWidth={2}
@@ -56,7 +56,7 @@ export function CategoryDonut({
         )}
       </div>
 
-      <ul className="flex w-full flex-col gap-2">
+      <ul className="flex w-full flex-col gap-1.5">
         {isPie && (
           <li className="flex items-center justify-between gap-2 border-b pb-2 text-sm">
             <span className="text-muted-foreground">Total del período</span>
@@ -64,7 +64,7 @@ export function CategoryDonut({
           </li>
         )}
         {data.map((slice) => (
-          <li key={slice.name} className="flex items-center justify-between gap-2 text-sm">
+          <li key={slice.name} className="flex items-center justify-between gap-2 text-xs">
             <span className="flex items-center gap-2">
               <span
                 className="inline-block size-2.5 rounded-full"

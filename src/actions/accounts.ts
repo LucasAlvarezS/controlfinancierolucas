@@ -44,12 +44,16 @@ export async function setAccountSavingsFlag(accountId: string, isSavings: boolea
 
 export async function disconnectAccount(accountId: string) {
   const userId = await requireUserId();
-  await prisma.financialAccount.updateMany({
+  // Verifica pertenencia antes de tocar la credencial (evita IDOR).
+  const account = await prisma.financialAccount.findFirstOrThrow({
     where: { id: accountId, userId },
+  });
+  await prisma.financialAccount.update({
+    where: { id: account.id },
     data: { status: "DISCONNECTED" },
   });
   await prisma.integrationCredential.deleteMany({
-    where: { financialAccountId: accountId },
+    where: { financialAccountId: account.id },
   });
   revalidatePath("/accounts");
 }
@@ -67,8 +71,10 @@ export async function syncAccountNow(accountId: string): Promise<{ error?: strin
   try {
     await syncFinancialAccount(account.id);
   } catch (error) {
+    // El detalle queda en el log del servidor; al cliente va un mensaje genérico.
+    console.error(`Error sincronizando cuenta ${account.id}:`, error);
     return {
-      error: error instanceof Error ? error.message : "Error desconocido al sincronizar",
+      error: "No se pudo sincronizar la cuenta. Probá de nuevo o volvé a conectarla.",
     };
   }
 

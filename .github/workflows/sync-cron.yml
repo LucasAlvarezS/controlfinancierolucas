@@ -1,0 +1,19 @@
+name: Sync horario de cuentas
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync Mercado Pago
+        run: |
+          curl -sS -f -X GET "${{ secrets.APP_BASE_URL }}/api/cron/sync-mercadopago" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Sync Fintoc
+        run: |
+          curl -sS -f -X GET "${{ secrets.APP_BASE_URL }}/api/cron/sync-fintoc" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

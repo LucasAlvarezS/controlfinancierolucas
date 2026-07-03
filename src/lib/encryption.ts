@@ -3,6 +3,13 @@ import { createCipheriv, createDecipheriv, randomBytes, timingSafeEqual } from "
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 
+/** Compara dos strings en tiempo constante (secrets de cron/widget). */
+export function timingSafeEqualString(a: string, b: string): boolean {
+  const bufferA = Buffer.from(a, "utf8");
+  const bufferB = Buffer.from(b, "utf8");
+  return bufferA.length === bufferB.length && timingSafeEqual(bufferA, bufferB);
+}
+
 function getKey(): Buffer {
   const key = process.env.ENCRYPTION_KEY;
   if (!key) {
