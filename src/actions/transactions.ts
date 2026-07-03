@@ -56,7 +56,6 @@ export async function createManualTransaction(input: {
 export async function updateTransactionCategory(input: {
   transactionId: string;
   categoryId: string;
-  applyToPastFromSameMerchant?: boolean;
 }) {
   const userId = await requireUserId();
 
@@ -70,22 +69,23 @@ export async function updateTransactionCategory(input: {
   });
 
   if (transaction.merchantNormalized) {
+    // Aprende la corrección (futuros imports) y la aplica a todo el
+    // historial del mismo comercio: mismo comercio, misma categoría.
     await learnFromCorrection(prisma, {
       userId,
       merchantNormalized: transaction.merchantNormalized,
       categoryId: input.categoryId,
     });
 
-    if (input.applyToPastFromSameMerchant) {
-      await prisma.transaction.updateMany({
-        where: { userId, merchantNormalized: transaction.merchantNormalized },
-        data: { categoryId: input.categoryId },
-      });
-    }
+    await prisma.transaction.updateMany({
+      where: { userId, merchantNormalized: transaction.merchantNormalized },
+      data: { categoryId: input.categoryId },
+    });
   }
 
   revalidatePath("/transactions");
   revalidatePath("/");
+  revalidatePath("/categories");
 }
 
 export async function deleteTransaction(transactionId: string) {
