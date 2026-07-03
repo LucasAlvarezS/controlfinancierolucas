@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { decrypt, encrypt } from "@/lib/encryption";
-import { categorizeTransaction, normalizeMerchant } from "@/lib/categorization/engine";
+import {
+  categorizeWithRules,
+  loadCategorizationRules,
+  normalizeMerchant,
+} from "@/lib/categorization/engine";
 import { getProvider } from "./registry";
 import type { CredentialTokens } from "./provider.interface";
 
@@ -62,43 +66,34 @@ export async function syncFinancialAccount(financialAccountId: string): Promise<
       account.lastSyncedAt,
     );
 
-    let imported = 0;
-    for (const movement of movements) {
-      const merchantNormalized = movement.merchantRaw
-        ? normalizeMerchant(movement.merchantRaw)
-        : normalizeMerchant(movement.description);
-
-      const categoryId = await categorizeTransaction(prisma, {
+    // Reglas cargadas una sola vez y escritura en lote: un primer sync grande
+    // (cientos de movimientos) debe caber en el tiempo de una función serverless.
+    const rules = await loadCategorizationRules(prisma, account.userId);
+    const rows = movements.map((movement) => {
+      const merchantNormalized = normalizeMerchant(
+        movement.merchantRaw ?? movement.description,
+      );
+      return {
+        financialAccountId: account.id,
         userId: account.userId,
+        externalId: movement.externalId,
+        amount: movement.amount,
+        currency: movement.currency,
+        description: movement.description,
+        merchantRaw: movement.merchantRaw,
         merchantNormalized,
-      });
+        date: movement.date,
+        categoryId: categorizeWithRules(rules, merchantNormalized) ?? undefined,
+        source: account.provider,
+        rawPayload: movement.raw as never,
+      };
+    });
 
-      const result = await prisma.transaction.upsert({
-        where: {
-          financialAccountId_externalId: {
-            financialAccountId: account.id,
-            externalId: movement.externalId,
-          },
-        },
-        update: {},
-        create: {
-          financialAccountId: account.id,
-          userId: account.userId,
-          externalId: movement.externalId,
-          amount: movement.amount,
-          currency: movement.currency,
-          description: movement.description,
-          merchantRaw: movement.merchantRaw,
-          merchantNormalized,
-          date: movement.date,
-          categoryId: categoryId ?? undefined,
-          source: account.provider,
-          rawPayload: movement.raw as never,
-        },
-      });
-
-      if (result) imported += 1;
-    }
+    // skipDuplicates usa el unique (financialAccountId, externalId): los ya
+    // importados se saltan y `count` refleja solo los realmente nuevos.
+    const { count: imported } = rows.length
+      ? await prisma.transaction.createMany({ data: rows, skipDuplicates: true })
+      : { count: 0 };
 
     // El saldo es best-effort: si el proveedor no lo expone o falla la
     // consulta, el sync de movimientos sigue siendo válido.

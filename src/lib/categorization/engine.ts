@@ -32,34 +32,58 @@ function matches(matchType: RuleMatchType, pattern: string, value: string): bool
   }
 }
 
+export interface CategorizationRuleLike {
+  matchType: RuleMatchType;
+  pattern: string;
+  categoryId: string;
+  priority: number;
+  source: string;
+}
+
 /**
- * Devuelve el categoryId de la primera regla que matchea, evaluando
- * primero las reglas aprendidas del usuario, luego las definidas por el
- * usuario, y por último las reglas default del sistema.
+ * Carga y ordena las reglas del usuario una sola vez (aprendidas > definidas
+ * por el usuario > defaults del sistema). Para syncs masivos, cargar una vez
+ * y categorizar en memoria con `categorizeWithRules`.
+ */
+export async function loadCategorizationRules(
+  prisma: PrismaClient,
+  userId: string,
+): Promise<CategorizationRuleLike[]> {
+  const rules = await prisma.categorizationRule.findMany({
+    where: {
+      OR: [{ userId }, { userId: null }],
+    },
+  });
+
+  return rules.sort((a, b) => {
+    const sourceDiff = SOURCE_PRIORITY[b.source] - SOURCE_PRIORITY[a.source];
+    if (sourceDiff !== 0) return sourceDiff;
+    return b.priority - a.priority;
+  });
+}
+
+/** Devuelve el categoryId de la primera regla (ya ordenada) que matchea. */
+export function categorizeWithRules(
+  rules: CategorizationRuleLike[],
+  merchantNormalized: string,
+): string | null {
+  for (const rule of rules) {
+    if (matches(rule.matchType, rule.pattern, merchantNormalized)) {
+      return rule.categoryId;
+    }
+  }
+  return null;
+}
+
+/**
+ * Conveniencia para categorizar una transacción suelta (alta manual).
  */
 export async function categorizeTransaction(
   prisma: PrismaClient,
   params: { userId: string; merchantNormalized: string },
 ): Promise<string | null> {
-  const rules = await prisma.categorizationRule.findMany({
-    where: {
-      OR: [{ userId: params.userId }, { userId: null }],
-    },
-  });
-
-  const sorted = rules.sort((a, b) => {
-    const sourceDiff = SOURCE_PRIORITY[b.source] - SOURCE_PRIORITY[a.source];
-    if (sourceDiff !== 0) return sourceDiff;
-    return b.priority - a.priority;
-  });
-
-  for (const rule of sorted) {
-    if (matches(rule.matchType, rule.pattern, params.merchantNormalized)) {
-      return rule.categoryId;
-    }
-  }
-
-  return null;
+  const rules = await loadCategorizationRules(prisma, params.userId);
+  return categorizeWithRules(rules, params.merchantNormalized);
 }
 
 /**
