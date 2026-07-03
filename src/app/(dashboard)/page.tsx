@@ -56,25 +56,23 @@ export default async function DashboardPage() {
   const prevYear = prevDate.getUTCFullYear();
   const prevMonth = prevDate.getUTCMonth() + 1;
 
-  const sixMonthsStart = new Date(Date.UTC(year, month - 6, 1));
-
   const expensesWhere = {
     userId,
     amount: { lt: 0 },
     financialAccount: { isSavings: false },
   };
 
-  const [monthByCategory, sixMonthsByCategory, currentSurplus, prevSurplus, savingsAgg] =
+  const [monthByCategory, balanceAgg, currentSurplus, prevSurplus, savingsAgg] =
     await Promise.all([
       prisma.transaction.groupBy({
         by: ["categoryId"],
         where: { ...expensesWhere, date: { gte: start, lt: end } },
         _sum: { amount: true },
       }),
-      prisma.transaction.groupBy({
-        by: ["categoryId"],
-        where: { ...expensesWhere, date: { gte: sixMonthsStart, lt: end } },
-        _sum: { amount: true },
+      // Saldo actual: suma de los saldos sincronizados (cuentas Fintoc).
+      prisma.financialAccount.aggregate({
+        where: { userId, status: "ACTIVE" },
+        _sum: { balance: true },
       }),
       calculateMonthlySurplus(prisma, { userId, year, month }),
       calculateMonthlySurplus(prisma, { userId, year: prevYear, month: prevMonth }),
@@ -83,26 +81,25 @@ export default async function DashboardPage() {
 
   const categoryIds = [
     ...new Set(
-      [...monthByCategory, ...sixMonthsByCategory]
-        .map((row) => row.categoryId)
-        .filter((id): id is string => Boolean(id)),
+      monthByCategory.map((row) => row.categoryId).filter((id): id is string => Boolean(id)),
     ),
   ];
   const categories = await prisma.category.findMany({ where: { id: { in: categoryIds } } });
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
   const monthSlices = buildSlices(monthByCategory, categoryById);
-  const sixMonthsSlices = buildSlices(sixMonthsByCategory, categoryById);
   const totalExpenses = monthSlices.reduce((acc, s) => acc + s.value, 0);
+  const currentBalance = Number(balanceAgg._sum.balance ?? 0);
 
   const savingsTotal = Number(savingsAgg._sum.currentAmount ?? 0);
   const monthLabel = start.toLocaleDateString("es-CL", { month: "long", year: "numeric" });
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-3">
       <HeroCard
         monthLabel={monthLabel}
-        totalExpenses={totalExpenses}
+        currentBalance={currentBalance}
+        monthExpenses={totalExpenses}
         deltaVsPrev={currentSurplus - prevSurplus}
       />
 
@@ -117,20 +114,11 @@ export default async function DashboardPage() {
       </div>
 
       <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="text-base">Gasto por categoría</CardTitle>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Gasto por categoría</CardTitle>
         </CardHeader>
         <CardContent>
           <CategoryDonut data={monthSlices} />
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-2xl">
-        <CardHeader>
-          <CardTitle className="text-base">Gasto por categoría (últimos 6 meses)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <CategoryDonut variant="pie" data={sixMonthsSlices} />
         </CardContent>
       </Card>
     </div>

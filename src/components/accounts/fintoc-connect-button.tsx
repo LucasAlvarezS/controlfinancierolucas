@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 // Widget hospedado de Fintoc: https://docs.fintoc.com/docs/web-integration.
@@ -58,6 +59,7 @@ export function FintocConnectButton({
   label: string;
 }) {
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   async function handleConnect() {
     setLoading(true);
@@ -79,7 +81,8 @@ export function FintocConnectButton({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ exchangeToken: linkIntent.exchangeToken }),
           });
-          window.location.href = "/accounts";
+          router.push("/accounts");
+          router.refresh();
         },
         onExit: () => setLoading(false),
       });

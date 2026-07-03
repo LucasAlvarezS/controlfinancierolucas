@@ -21,6 +21,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
+  // viewport-fit=cover habilita env(safe-area-inset-*) en iOS (PWA standalone).
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#3c0061" },
     { media: "(prefers-color-scheme: dark)", color: "#100b1a" },

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { timingSafeEqualString } from "@/lib/encryption";
 import { calculateMonthlySurplus } from "@/lib/savings/engine";
 
 // Resumen para el widget del iPhone (Scriptable). Autentica por secret
 // dedicado; si WIDGET_SECRET no está configurado se rechaza todo.
 function isAuthorized(request: NextRequest): boolean {
+  const header = request.headers.get("authorization");
   const expected = process.env.WIDGET_SECRET;
-  return Boolean(expected) && request.headers.get("authorization") === `Bearer ${expected}`;
+  if (!expected || !header) return false;
+  return timingSafeEqualString(header, `Bearer ${expected}`);
 }
 
 export async function GET(request: NextRequest) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import {
   Select,
   SelectContent,
@@ -28,14 +28,18 @@ export function CategorySelectCell({
   categories: Option[];
 }) {
   const [isPending, startTransition] = useTransition();
+  // Actualización optimista: el valor elegido se refleja al instante y la
+  // server action corre de fondo; al revalidar, vuelve a mandar la prop.
+  const [optimisticId, setOptimisticId] = useState<string | null>(null);
   const optionById = new Map(categories.map((c) => [c.id, c]));
+  const currentValue = (isPending && optimisticId) || categoryId || null;
 
   return (
     <Select
-      value={categoryId ?? undefined}
-      disabled={isPending}
+      value={currentValue}
       onValueChange={(value) => {
         if (typeof value !== "string") return;
+        setOptimisticId(value);
         startTransition(async () => {
           await updateTransactionCategory({ transactionId, categoryId: value });
         });
