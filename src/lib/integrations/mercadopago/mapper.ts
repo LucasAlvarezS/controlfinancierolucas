@@ -6,8 +6,15 @@ import type { NormalizedMovement } from "../provider.interface";
 const IMPORTABLE_STATUSES = new Set(["approved", "authorized"]);
 
 // Operaciones internas de la propia cuenta MP (conversiones a stablecoin,
-// particiones de saldo): no son ingreso ni gasto del usuario.
-const INTERNAL_OPERATION_TYPES = new Set(["money_exchange", "partition_transfer"]);
+// particiones de saldo, cargas de saldo desde banco/tarjeta propia): mueven
+// plata del usuario hacia/dentro de su cuenta, no son ingreso ni gasto reales.
+// El guard de abajo (collector == payer == usuario) evita descartar por error
+// una carga real de un tercero.
+const INTERNAL_OPERATION_TYPES = new Set([
+  "money_exchange",
+  "partition_transfer",
+  "account_fund",
+]);
 
 function collectorId(payment: MpPayment): string {
   return String(payment.collector_id ?? payment.collector?.id ?? "");
