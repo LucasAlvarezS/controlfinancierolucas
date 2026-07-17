@@ -118,3 +118,73 @@ export async function searchPayments(
 
   return payments;
 }
+
+// --- API de reportes (release_report) ---------------------------------------
+// Los retiros / transferencias SALIENTES de la cuenta NO aparecen en
+// /v1/payments/search (son otro tipo de objeto). Sí aparecen en el
+// release_report, cuya generación es asíncrona: se pide (POST → 202), se espera
+// a que quede listo y se descarga el CSV.
+
+export interface MpReportListItem {
+  id: number;
+  file_name: string;
+  date_created: string; // ISO con offset, ej. "2026-07-08T14:54:27.000-04:00"
+  begin_date: string;
+  end_date: string;
+  status: string;
+}
+
+/** Formato que exige la API de reportes: YYYY-MM-DDTHH:mm:ssZ (sin milisegundos). */
+function reportDate(date: Date, endOfDay: boolean): string {
+  return `${date.toISOString().slice(0, 10)}T${endOfDay ? "23:59:59" : "00:00:00"}Z`;
+}
+
+/** Encola la generación de un release_report para el rango dado (async → 202). */
+export async function requestReleaseReport(
+  accessToken: string,
+  begin: Date,
+  end: Date,
+): Promise<void> {
+  const response = await fetch(`${MP_API_BASE}/v1/account/release_report`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      begin_date: reportDate(begin, false),
+      end_date: reportDate(end, true),
+    }),
+  });
+  // 202 = generación encolada. Otros no-2xx: error real.
+  if (response.status !== 202 && !response.ok) {
+    throw new Error(`Error generando release_report de Mercado Pago: ${response.status}`);
+  }
+}
+
+/** Lista los reportes ya generados (los listos se pueden descargar). */
+export async function listReleaseReports(accessToken: string): Promise<MpReportListItem[]> {
+  const response = await fetch(`${MP_API_BASE}/v1/account/release_report/list`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    throw new Error(`Error listando release_report de Mercado Pago: ${response.status}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+/** Descarga el CSV de un reporte ya generado. */
+export async function downloadReleaseReport(
+  accessToken: string,
+  fileName: string,
+): Promise<string> {
+  const response = await fetch(
+    `${MP_API_BASE}/v1/account/release_report/${fileName}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!response.ok) {
+    throw new Error(`Error descargando release_report ${fileName}: ${response.status}`);
+  }
+  return response.text();
+}

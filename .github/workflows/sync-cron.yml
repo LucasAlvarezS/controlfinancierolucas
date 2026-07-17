@@ -9,11 +9,40 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Sync Mercado Pago
+      - name: Sync de cuentas (Mercado Pago + Fintoc)
+        env:
+          BASE: ${{ secrets.APP_BASE_URL }}
+          SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -sS -f -X GET "${{ secrets.APP_BASE_URL }}/api/cron/sync-mercadopago" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
-      - name: Sync Fintoc
-        run: |
-          curl -sS -f -X GET "${{ secrets.APP_BASE_URL }}/api/cron/sync-fintoc" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          set -u
+          fail=0
+
+          # Sincroniza un proveedor. No usa `curl -f` para poder ver el cuerpo de
+          # la respuesta también en 4xx/5xx. Los dos proveedores corren siempre:
+          # un fallo en uno NO impide sincronizar el otro.
+          sync() {
+            name="$1"; path="$2"
+            echo "──────────── $name ────────────"
+            code=$(curl -sS -o body.txt -w "%{http_code}" \
+              -H "Authorization: Bearer $SECRET" "$BASE$path") || {
+                echo "❌ $name: curl no pudo conectar a $BASE$path (¿APP_BASE_URL?)"
+                fail=1; return; }
+            echo "HTTP $code"
+            echo "Respuesta: $(cat body.txt)"
+            if [ "$code" = "401" ]; then
+              echo "❌ $name: 401 no autorizado → revisá CRON_SECRET (secret de GitHub) vs. la env CRON_SECRET en Vercel."
+              fail=1
+            elif [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+              echo "❌ $name: HTTP $code"
+              fail=1
+            elif grep -q '"ok":false' body.txt; then
+              echo "⚠️ $name: el sync terminó con errores por cuenta (ver respuesta)."
+              fail=1
+            else
+              echo "✅ $name OK"
+            fi
+          }
+
+          sync "Mercado Pago" "/api/cron/sync-mercadopago"
+          sync "Fintoc" "/api/cron/sync-fintoc"
+          exit $fail
