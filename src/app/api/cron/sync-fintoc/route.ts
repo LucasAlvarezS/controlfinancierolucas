@@ -10,6 +10,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const results = await syncAllAccountsForProvider("FINTOC");
-  return NextResponse.json({ results });
+  // Un tropiezo transitorio (blip de DB, caída del proveedor) no debe devolver
+  // 5xx y hacer fallar el workflow en falso: se responde 200 con {ok:false} y el
+  // detalle, para que el cron lo reporte sin romper la corrida.
+  try {
+    const results = await syncAllAccountsForProvider("FINTOC");
+    const ok = results.every((result) => !result.error);
+    return NextResponse.json({ ok, results });
+  } catch (error) {
+    return NextResponse.json({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
